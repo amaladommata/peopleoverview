@@ -1,4 +1,12 @@
-import { Employee, GrievanceRecord, PipCase, PipSummary, ResignationRecord } from "./types";
+import {
+  ConnectRecord,
+  Employee,
+  GrievanceRecord,
+  PipCase,
+  PipSummary,
+  ProbationRecord,
+  ResignationRecord,
+} from "./types";
 import { serialToDate } from "./serial-date";
 
 export type SheetRow = Record<string, unknown>;
@@ -94,11 +102,18 @@ export function buildRoster(headcountRows: SheetRow[], attritionRows: SheetRow[]
   return [...activeDeduped, ...exited];
 }
 
-// Resignation Tracker — resignationDate/status/withdrawalDate stay null
-// until the 3 new columns exist on the source sheet (PRD §4, §10.1).
-export function mapResignationRow(r: SheetRow): ResignationRecord {
-  const rawStatus = str(r["Status"]);
-  const validStatuses = ["Serving Notice", "Withdrawn", "Converted to Exit", "Absconded"];
+// "Resignations - August" tab (the in-notice pipeline) — RAD (resignation
+// date) and LWD (expected last working day) exist as of the live sheet,
+// but there is no explicit Status column. Status is derived from `now` vs
+// expectedLwd; see the comment on ResignationRecord in lib/types.ts for why
+// "Withdrawn"/"Absconded" can never come out of this derivation.
+export function mapResignationRow(r: SheetRow, now: Date = new Date()): ResignationRecord {
+  const expectedLwd = serialToDate(r["LWD"]);
+  const status: ResignationRecord["status"] = expectedLwd
+    ? expectedLwd > now
+      ? "Serving Notice"
+      : "Converted to Exit"
+    : null;
   return {
     id: str(r["Employee ID"]),
     name: str(r["Employee Name"]),
@@ -109,9 +124,10 @@ export function mapResignationRow(r: SheetRow): ResignationRecord {
     tenureYears: num(r["Tenure (Years)"]) ?? 0,
     reasonCategory: str(r["Primary Exit Reason"]),
     notes: str(r["Notes"]),
-    resignationDate: r["Resignation Date"] !== undefined ? serialToDate(r["Resignation Date"]) : null,
-    status: validStatuses.includes(rawStatus) ? (rawStatus as ResignationRecord["status"]) : null,
-    withdrawalDate: r["Withdrawal Date"] !== undefined ? serialToDate(r["Withdrawal Date"]) : null,
+    resignationDate: serialToDate(r["RAD"]),
+    status,
+    withdrawalDate: null,
+    expectedLwd,
   };
 }
 
@@ -131,15 +147,27 @@ export function mapGrievanceRow(r: SheetRow): GrievanceRecord {
   };
 }
 
-export function mapPipSummaryRow(r: SheetRow): PipSummary {
+// The live "PIP" tab is a case log only — no auto-calc summary block like
+// the original PRD's PIP Register. The summary is derived from case rows
+// instead (mirrors the sheet's old formulas, computed in code so it works
+// regardless of whether a summary block ever exists on the tab).
+export function computePipSummary(cases: PipCase[], now: Date = new Date()): PipSummary {
+  const closed = cases.filter((c) => c.status.toLowerCase() !== "active");
+  const closedSuccess = closed.filter((c) => /success/i.test(c.status)).length;
+  const closedExtended = closed.filter((c) => /extend/i.test(c.status)).length;
+  const closedExitInitiated = closed.filter((c) => /exit/i.test(c.status)).length;
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const newThisMonth = cases.filter((c) => c.startDate && c.startDate >= startOfMonth).length;
+  const overdueReviews = cases.filter((c) => c.nextReviewDate && c.nextReviewDate < now).length;
+  const closedCount = closed.length;
   return {
-    totalActive: num(r["Total Active PIPs"]) ?? 0,
-    newThisMonth: num(r["New This Month"]) ?? 0,
-    closedSuccess: num(r["Closed - Success"]) ?? 0,
-    closedExtended: num(r["Closed - Extended"]) ?? 0,
-    closedExitInitiated: num(r["Closed - Exit Initiated"]) ?? 0,
-    overdueReviews: num(r["Overdue Reviews"]) ?? 0,
-    successRate: num(r["Success Rate"]),
+    totalActive: cases.filter((c) => c.status.toLowerCase() === "active").length,
+    newThisMonth,
+    closedSuccess,
+    closedExtended,
+    closedExitInitiated,
+    overdueReviews,
+    successRate: closedCount > 0 ? (closedSuccess / closedCount) * 100 : null,
   };
 }
 
@@ -151,9 +179,44 @@ export function mapPipCaseRow(r: SheetRow): PipCase {
     team: str(r["Project / Team"]),
     startDate: serialToDate(r["PIP Start Date"]),
     endDate: serialToDate(r["PIP End Date"]),
+    // No "Next Review Date" column on the live tab — stays null.
     nextReviewDate: serialToDate(r["Next Review Date"]),
     status: str(r["Status"]),
     milestones: milestoneKeys.map((k) => str(r[k])).filter(Boolean),
-    outcomeNotes: str(r["Outcome Notes"]),
+    outcomeNotes: str(r["Outcome / HRBP Notes"]),
+  };
+}
+
+// "One Year Connects" tab — flight-risk / retention-connect tracker.
+export function mapConnectRow(r: SheetRow): ConnectRecord {
+  const marking = str(r["HRBP EWS Marking"]).toUpperCase();
+  return {
+    id: str(r["MMID"]),
+    name: str(r["Full name"]),
+    band: str(r["Grade"]),
+    doj: serialToDate(r["DOJ"]),
+    team: str(r["Team"]),
+    businessHead: str(r["Business Head"]),
+    hrbp: str(r["HRBP"]),
+    connectStatus: str(r["Connect Status"]),
+    connectDate: serialToDate(r["Connect Date"]),
+    ewsMarking: (["RED", "AMBER", "GREEN"].includes(marking) ? marking : null) as ConnectRecord["ewsMarking"],
+    comments: str(r["HRBP Comments"]),
+  };
+}
+
+// Probation tracker tab.
+export function mapProbationRow(r: SheetRow): ProbationRecord {
+  return {
+    id: str(r["Employee ID"]),
+    name: str(r["Employee Name"]),
+    band: str(r["Band/Level"]),
+    client: str(r["Client"]),
+    team: str(r["Team"]),
+    deliveryLead: str(r["Delivery Lead"]),
+    joiningDate: serialToDate(r["Joining Date"]),
+    probationEndDate: serialToDate(r["Probation End Date"] ?? r["Probation \nEnd Date"]),
+    status: str(r["Status"]),
+    comments: str(r["Comments"]),
   };
 }

@@ -28,10 +28,50 @@ export interface ResignationRecord {
   tenureYears: number;
   reasonCategory: string;
   notes: string;
-  // Below fields are NULL until the 3 new sheet columns exist (PRD §4, §10.1)
+  // As of the live "Resignations - August" tab (added post-PRD): RAD + LWD
+  // exist, but there is no explicit Status column. resignationDate = RAD.
+  // status is derived — "Serving Notice" while expectedLwd is still in the
+  // future, "Converted to Exit" once it's passed (the row should normally
+  // have been moved to the Attrition tab by then, but this stays correct
+  // defensively either way). "Withdrawn"/"Absconded" are never derived from
+  // this tab — nothing in the data signals a withdrawal, since a withdrawn
+  // row is presumably just deleted rather than status-flagged. That means
+  // resignationsWithdrawn stays null (not fabricable from a single snapshot)
+  // until the sheet tracks it explicitly.
   resignationDate: Date | null;
   status: "Serving Notice" | "Withdrawn" | "Converted to Exit" | "Absconded" | null;
   withdrawalDate: Date | null;
+  expectedLwd: Date | null;
+}
+
+// "One Year Connects" tab — a flight-risk / retention-connect tracker
+// (RED/AMBER/GREEN), added to the sheet after the PRD was written.
+export interface ConnectRecord {
+  id: string;
+  name: string;
+  band: string;
+  doj: Date | null;
+  team: string;
+  businessHead: string;
+  hrbp: string;
+  connectStatus: string;
+  connectDate: Date | null;
+  ewsMarking: "RED" | "AMBER" | "GREEN" | null;
+  comments: string;
+}
+
+// Probation tracker — added to the sheet after the PRD was written.
+export interface ProbationRecord {
+  id: string;
+  name: string;
+  band: string;
+  client: string;
+  team: string;
+  deliveryLead: string;
+  joiningDate: Date | null;
+  probationEndDate: Date | null;
+  status: string;
+  comments: string;
 }
 
 export interface GrievanceRecord {

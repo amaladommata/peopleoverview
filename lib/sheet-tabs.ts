@@ -1,46 +1,69 @@
-// Exact tab layout of the source workbook (Alekhya_August_HRBP_Tracker),
-// verified against a real export. Row numbers are 1-indexed A1-notation,
-// matching PRD §4.1 / Appendix §D-E. Update here, not per-caller, if HRBP
-// restructures a tab.
+// Exact tab layout of the live "Global Media & Creative - People Dashboard"
+// sheet (spreadsheetId in GOOGLE_SHEET_ID), verified 2026-09-02. This sheet
+// was restructured after the PRD/Appendix were written — tab names and a
+// couple of schemas differ from what's documented there. Row numbers are
+// 1-indexed A1-notation. Update here, not per-caller, if HRBP restructures
+// a tab again.
 export const SHEET_TABS = {
+  // NOTE: confirmed with HRBP to stay a single continuously-updated tab
+  // (not renamed monthly) — same as `resignation` below. The trailing
+  // "- 29" is unconfirmed to be stable; if it ever changes, update here.
   headcount: {
-    name: "Headcount Overview",
+    name: "Employee Data - 29",
     headerRow: 1,
     dataStartRow: 2,
     lastCol: "AB",
   },
+  // Confirmed exits — LWD already occurred. Schema unchanged from the
+  // original PRD/Appendix, just moved to a plainly-named "Attrition" tab.
   attrition: {
-    name: "Attrition Tracker",
+    name: "Attrition",
     headerRow: 1,
     dataStartRow: 2,
     lastCol: "Y",
   },
+  // In-notice pipeline — confirmed to stay one continuous tab, not
+  // recreated monthly, despite the "- August" in its current name.
+  // RAD (resignation date) + LWD (expected last working day) columns now
+  // exist; there is no explicit Status column (see ResignationRecord).
   resignation: {
-    // Mislabeled internally as "ATTRITION TRACKER" (PRD §4) — functions as
-    // the resignation log. Title/description occupy rows 1-2, a monthly
-    // summary block rows 4-6, the actual exit log starts at row 9.
-    name: "📉 Resignation Tracker",
-    headerRow: 9,
-    dataStartRow: 10,
-    lastCol: "K",
+    name: "Resignations - August",
+    headerRow: 1,
+    dataStartRow: 2,
+    lastCol: "L",
   },
+  // Not yet created in the source sheet (PRD's Grievance Tracker tab).
+  // getGrievances() handles a missing tab gracefully and returns [].
   grievance: {
     name: "Grievance Tracker",
     headerRow: 2,
     dataStartRow: 3,
     lastCol: "I",
   },
-  pipSummary: {
-    name: "📈 PIP Register",
-    headerRow: 5,
-    dataStartRow: 6,
-    lastCol: "G",
-  },
+  // Case log only — no auto-calc summary block exists on this tab (unlike
+  // the original PRD's PIP Register). The summary shown in the app is
+  // derived in code from these case rows instead (lib/data-source.ts).
   pipCases: {
-    name: "📈 PIP Register",
-    headerRow: 10,
-    dataStartRow: 11,
-    lastCol: "L",
+    name: "PIP",
+    headerRow: 1,
+    dataStartRow: 2,
+    lastCol: "K",
+  },
+  // Flight-risk / retention-connect tracker (RED/AMBER/GREEN), not in the
+  // original PRD — added to the dashboard scope per HRBP request.
+  connects: {
+    name: "One Year Connects - August",
+    headerRow: 1,
+    dataStartRow: 2,
+    lastCol: "N",
+  },
+  // Probation tracker, not in the original PRD — added to the dashboard
+  // scope per HRBP request.
+  probation: {
+    name: "Probation",
+    headerRow: 1,
+    dataStartRow: 2,
+    lastCol: "J",
   },
 } as const;
 

@@ -4,16 +4,29 @@ import { fetchRange } from "./sheets-client";
 import { dataRange, headerRange, SHEET_TABS } from "./sheet-tabs";
 import {
   buildRoster,
+  computePipSummary,
+  mapConnectRow,
   mapGrievanceRow,
   mapPipCaseRow,
-  mapPipSummaryRow,
+  mapProbationRow,
   mapResignationRow,
   rowsToRecords,
 } from "./mappers";
-import { Employee, GrievanceRecord, PipCase, PipSummary, ResignationRecord } from "./types";
+import {
+  ConnectRecord,
+  Employee,
+  GrievanceRecord,
+  PipCase,
+  PipSummary,
+  ProbationRecord,
+  ResignationRecord,
+} from "./types";
 
 // 60s revalidate window (Appendix §D) — keeps Sheets API calls bounded
 // under repeated dashboard refreshes without baking data into the build.
+// There's no push/webhook from Sheets API v4, so "auto-refresh on sheet
+// update" means: re-fetched on next page load once this window has elapsed,
+// not an instant push the moment someone edits a cell.
 const REVALIDATE_SECONDS = 60;
 
 async function fetchTab(tab: (typeof SHEET_TABS)[keyof typeof SHEET_TABS]) {
@@ -41,42 +54,57 @@ export const getRoster = unstable_cache(
 export const getResignations = unstable_cache(
   async (): Promise<ResignationRecord[]> => {
     const rows = await fetchTab(SHEET_TABS.resignation);
-    return rows.map(mapResignationRow);
+    return rows.map((r) => mapResignationRow(r));
   },
   ["resignations"],
   { revalidate: REVALIDATE_SECONDS }
 );
 
+// The source Grievance Tracker tab doesn't exist yet (HRBP will add it to
+// this same sheet later) — fail soft to [] rather than erroring the whole
+// dashboard on a missing-sheet API error.
 export const getGrievances = unstable_cache(
   async (): Promise<GrievanceRecord[]> => {
-    const rows = await fetchTab(SHEET_TABS.grievance);
-    return rows.map(mapGrievanceRow);
+    try {
+      const rows = await fetchTab(SHEET_TABS.grievance);
+      return rows.map(mapGrievanceRow);
+    } catch {
+      return [];
+    }
   },
   ["grievances"],
   { revalidate: REVALIDATE_SECONDS }
 );
 
+// The live "PIP" tab has no auto-calc summary block — summary is derived
+// in code from the case rows (see computePipSummary).
 export const getPip = unstable_cache(
   async (): Promise<{ summary: PipSummary; cases: PipCase[] }> => {
-    const [summaryHeader, summaryRow, caseRows] = await Promise.all([
-      fetchRange(headerRange(SHEET_TABS.pipSummary)),
-      fetchRange(dataRange(SHEET_TABS.pipSummary, SHEET_TABS.pipSummary.dataStartRow)),
-      fetchTab(SHEET_TABS.pipCases),
-    ]);
-    const summaryRecords = rowsToRecords(summaryHeader[0] ?? [], summaryRow);
-    const summary = summaryRecords[0]
-      ? mapPipSummaryRow(summaryRecords[0])
-      : {
-          totalActive: 0,
-          newThisMonth: 0,
-          closedSuccess: 0,
-          closedExtended: 0,
-          closedExitInitiated: 0,
-          overdueReviews: 0,
-          successRate: null,
-        };
-    return { summary, cases: caseRows.map(mapPipCaseRow) };
+    const rows = await fetchTab(SHEET_TABS.pipCases);
+    const cases = rows.map(mapPipCaseRow);
+    return { summary: computePipSummary(cases), cases };
   },
   ["pip"],
+  { revalidate: REVALIDATE_SECONDS }
+);
+
+// "One Year Connects" — flight-risk / retention-connect tracker, added to
+// dashboard scope per HRBP request (not in the original PRD).
+export const getConnects = unstable_cache(
+  async (): Promise<ConnectRecord[]> => {
+    const rows = await fetchTab(SHEET_TABS.connects);
+    return rows.map(mapConnectRow);
+  },
+  ["connects"],
+  { revalidate: REVALIDATE_SECONDS }
+);
+
+// Probation tracker, added to dashboard scope per HRBP request.
+export const getProbation = unstable_cache(
+  async (): Promise<ProbationRecord[]> => {
+    const rows = await fetchTab(SHEET_TABS.probation);
+    return rows.map(mapProbationRow);
+  },
+  ["probation"],
   { revalidate: REVALIDATE_SECONDS }
 );
