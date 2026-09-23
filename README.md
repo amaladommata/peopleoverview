@@ -6,9 +6,9 @@ manually-built PowerPoint deck and Looker Studio attrition numbers.
 See `PRD_HRBP_Leadership_Dashboard.md` and `APPENDIX_Data_Contracts.md` (not
 committed here — kept with the requesting team) for the full spec.
 
-## Status: Phase 1 of 8 complete
+## Status: Phase 2 of 8 complete
 
-Data layer + core calculation engine, per PRD §12 phase 1.
+Data layer (Phase 1) + the live dashboard UI (Phase 2), per PRD §12.
 
 - `lib/types.ts` — the typed contracts (Appendix §A)
 - `lib/attrition.ts` — `computePeriodMetrics()`, the single source of truth
@@ -18,6 +18,42 @@ Data layer + core calculation engine, per PRD §12 phase 1.
   and column mapping (Appendix §D–E)
 - `app/api/*` — server-only route handlers, 60s revalidate via
   `unstable_cache`, never expose raw sheet data to the client
+- `lib/period.ts` — period-switcher math (week/month/YTD/custom), plus the
+  fixed MTD/YTD ranges and trailing-12-months buckets used everywhere a
+  table needs a period-independent anchor
+- `lib/cuts.ts` — data-cut (Client/Band/PG Rating) and cross-tab (Delivery
+  Lead ranking, tenure-band exits, PG rating vs. exit) aggregation, each row
+  independently recomputed through `computePeriodMetrics()`
+- `lib/takeaways.ts` — the rule-based Leadership Takeaways engine (PRD
+  §7.7) — plain threshold checks, zero AI/LLM/external API
+- `app/page.tsx` (server component, fetches everything once) +
+  `components/Dashboard.tsx` (client component: period switcher,
+  Client/Delivery Lead filters, and every section, all driven by one
+  `computePeriodMetrics()`-backed state) + `components/TrendChart.tsx` /
+  `ExitReasonsChart.tsx` (Recharts)
+- `config/people-updates.ts` — the manually-edited People Updates list
+  (PRD §7.11/§10 item 4 — no sheet tab backs this)
+
+### Not yet built (Phases 3, 6–8)
+
+- PPTX export, manual email send, and the access-gate/password protection
+  are still open — the export panel from the reviewed layout mockup was
+  intentionally left out of this phase rather than shipped as a
+  non-functional button.
+- The exit log doesn't yet show the detailed free-text note or a
+  compensation-visibility toggle (PRD §7.8) — `Employee` in `lib/types.ts`
+  only carries `reasonCategory` (the category), not the free-text detail or
+  compensation fields from the Attrition tab's `Detailed Reason`/`Package
+  offered`/`Current Package`/`Hike%` columns. Wiring that needs either a
+  new field on `Employee` or a separate lookup by MM ID — flagging as a gap
+  rather than fabricating the toggle.
+- **Not runnable end-to-end in this environment**: there's no
+  `GOOGLE_SERVICE_ACCOUNT_KEY` here, so the live page has never actually
+  been loaded in a browser against real data. Verified instead via a clean
+  `tsc --noEmit`, a clean `next build`, and 55 passing unit tests covering
+  every piece of pure logic (period math, data cuts, takeaways, mappers,
+  the calculation engine). Confirm the actual rendered page once deployed
+  with real credentials.
 
 ### Verified against the real sheet
 
@@ -134,7 +170,7 @@ silently worked around:
 3. People Updates (PRD §10 item 4) will stay a manually-edited config file
    for v1, per the PRD's own recommendation, unless told otherwise.
 
-## Next: Phase 2
+## Next: Phase 3+
 
-KPI tiles + period switcher + client/delivery-lead filters + trend chart,
-per PRD §12 and the layout preview reviewed with HRBP.
+PPTX export, manual email send, and the access gate (PRD §12 phases 6–8),
+plus the exit-log detail/compensation gap noted above.

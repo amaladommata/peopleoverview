@@ -1,14 +1,31 @@
-// Phase 1 placeholder — data layer + calculation engine only (PRD §12).
-// UI sections (period switcher, KPI tiles, charts) land in Phase 2+.
-export default function Home() {
+import Dashboard from "@/components/Dashboard";
+import { getConnects, getGrievances, getPip, getResignations, getRoster } from "@/lib/data-source";
+
+export const dynamic = "force-dynamic";
+
+// Server component: fetches everything once from the Sheets API (server
+// side, per PRD §4 — never exposes raw sheet rows to the client, only the
+// typed contracts). All period/filter recalculation happens client-side in
+// <Dashboard> against this one fetched snapshot (PRD §9 — period switch
+// recalculation <300ms, no re-fetch per section).
+export default async function Home() {
+  const [roster, resignations, grievances, pip, connects] = await Promise.all([
+    getRoster(),
+    getResignations(),
+    getGrievances(),
+    getPip(),
+    getConnects(),
+  ]);
+
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">People Overview</h1>
-        <p className="mt-2 text-gray-600">
-          Phase 1 (data layer + attrition calc) complete. Dashboard UI coming in Phase 2.
-        </p>
-      </div>
-    </main>
+    <Dashboard
+      roster={roster}
+      resignations={resignations}
+      grievances={grievances}
+      pipSummary={pip.summary}
+      pipCases={pip.cases}
+      connects={connects}
+      lastRefreshed={new Date().toISOString()}
+    />
   );
 }
