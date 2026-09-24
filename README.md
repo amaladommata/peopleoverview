@@ -87,12 +87,24 @@ cp .env.example .env.local   # fill in GOOGLE_SERVICE_ACCOUNT_KEY
 npm run dev
 ```
 
-Required env vars (Appendix §C): `GOOGLE_SERVICE_ACCOUNT_KEY`,
-`GOOGLE_SHEET_ID`. `GOOGLE_SHEET_ID` for the real "Global Media & Creative -
-People Dashboard" sheet is already filled in in `.env.example` — you still
-need to create a Google Cloud service account, share that Sheet with its
-email as Viewer, and set `GOOGLE_SERVICE_ACCOUNT_KEY` yourself; nothing here
-can do that step for you.
+Required env vars (Appendix §C): `GOOGLE_SHEET_ID` (already filled in in
+`.env.example` for the real "Global Media & Creative - People Dashboard"
+sheet) plus **one** of two auth options — `lib/sheets-client.ts` tries the
+service account first, then falls back to OAuth2:
+
+- **Service account** (recommended) — `GOOGLE_SERVICE_ACCOUNT_KEY`. Create a
+  GCP service account, share the Sheet with its email as Viewer, paste the
+  downloaded JSON key (raw or base64) as the value. Doesn't expire, nothing
+  to re-authorize.
+- **OAuth2** — `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` /
+  `GOOGLE_OAUTH_REFRESH_TOKEN`, all three. Requires a one-time browser
+  consent flow with an account that has Viewer access to the Sheet.
+  **Set the OAuth consent screen to "In production"** — left in "Testing,"
+  Google expires the refresh token after 7 days and the dashboard starts
+  failing silently a week after setup.
+
+Nothing here can do either setup step for you — see the deploy conversation
+for the exact console steps.
 
 ## The live sheet has diverged from the PRD/Appendix
 
