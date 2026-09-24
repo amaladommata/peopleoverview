@@ -86,6 +86,12 @@ export function computePeriodMetrics(
   });
 
   const hasResignationDates = scopedResignations.some((r) => r.resignationDate !== null);
+  // Separate from hasResignationDates: the live "Resignations - August" tab
+  // has RAD/LWD but no withdrawal signal at all (see mapResignationRow), so
+  // withdrawalDate is currently always null. Reporting 0 here would claim
+  // "confirmed zero withdrawals" when really "not trackable yet" — stay
+  // null until some row actually carries a withdrawalDate.
+  const hasWithdrawalDates = scopedResignations.some((r) => r.withdrawalDate !== null);
 
   const resignationsReceived = hasResignationDates
     ? scopedResignations.filter(
@@ -93,7 +99,7 @@ export function computePeriodMetrics(
       ).length
     : null;
 
-  const resignationsWithdrawn = hasResignationDates
+  const resignationsWithdrawn = hasWithdrawalDates
     ? scopedResignations.filter(
         (r) => r.withdrawalDate && r.withdrawalDate >= start && r.withdrawalDate <= end
       ).length

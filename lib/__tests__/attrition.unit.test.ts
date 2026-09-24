@@ -141,11 +141,36 @@ describe("computePeriodMetrics scoping", () => {
         resignationDate: d(2026, 8, 10),
         status: "Serving Notice",
         withdrawalDate: null,
+        expectedLwd: d(2026, 9, 15),
       },
     ];
     const metrics = computePeriodMetrics(roster, resignations, { client: "Hulu" }, start, end);
     expect(metrics.resignationsReceived).toBe(1);
-    expect(metrics.resignationsWithdrawn).toBe(0);
+    // No row in this dataset carries a withdrawalDate, so withdrawn stays
+    // null (not derivable) rather than a fabricated 0 — see attrition.ts.
+    expect(metrics.resignationsWithdrawn).toBeNull();
     expect(metrics.inNoticePipeline).toBe(1);
+  });
+
+  it("resignationsWithdrawn becomes a real count once a record carries a withdrawalDate", () => {
+    const resignations: ResignationRecord[] = [
+      {
+        id: "MM9",
+        name: "Someone",
+        client: "Hulu",
+        team: "Team A",
+        deliveryLead: "Lead A",
+        band: "A1",
+        tenureYears: 2,
+        reasonCategory: "Compensation",
+        notes: "",
+        resignationDate: d(2026, 8, 10),
+        status: "Withdrawn",
+        withdrawalDate: d(2026, 8, 20),
+        expectedLwd: null,
+      },
+    ];
+    const metrics = computePeriodMetrics(roster, resignations, { client: "Hulu" }, start, end);
+    expect(metrics.resignationsWithdrawn).toBe(1);
   });
 });
