@@ -54,15 +54,61 @@ function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export default function Dashboard({
-  roster,
-  resignations,
-  grievances,
-  pipSummary,
-  pipCases,
-  connects,
-  lastRefreshed,
-}: DashboardProps) {
+// Date instances don't survive the server component -> client component
+// prop boundary as actual Date objects (they arrive as something without
+// Date.prototype methods, e.g. plain strings) — every date-typed field has
+// to be explicitly reconstructed here rather than trusted as-is. Without
+// this, anything calling .toLocaleDateString() etc. on a prop-passed value
+// throws "t.toLocaleDateString is not a function".
+function reviveDate(v: unknown): Date | null {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) return v;
+  const d = new Date(v as string);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function reviveRoster(roster: Employee[]): Employee[] {
+  return roster.map((e) => ({ ...e, doj: reviveDate(e.doj), exitDate: reviveDate(e.exitDate) }));
+}
+
+function reviveResignations(resignations: ResignationRecord[]): ResignationRecord[] {
+  return resignations.map((r) => ({
+    ...r,
+    resignationDate: reviveDate(r.resignationDate),
+    withdrawalDate: reviveDate(r.withdrawalDate),
+    expectedLwd: reviveDate(r.expectedLwd),
+  }));
+}
+
+function reviveGrievances(grievances: GrievanceRecord[]): GrievanceRecord[] {
+  return grievances.map((g) => ({
+    ...g,
+    dateRaised: reviveDate(g.dateRaised),
+    closureDate: reviveDate(g.closureDate),
+  }));
+}
+
+function revivePipCases(cases: PipCase[]): PipCase[] {
+  return cases.map((c) => ({
+    ...c,
+    startDate: reviveDate(c.startDate),
+    endDate: reviveDate(c.endDate),
+    nextReviewDate: reviveDate(c.nextReviewDate),
+  }));
+}
+
+function reviveConnects(connects: ConnectRecord[]): ConnectRecord[] {
+  return connects.map((c) => ({ ...c, doj: reviveDate(c.doj), connectDate: reviveDate(c.connectDate) }));
+}
+
+export default function Dashboard(props: DashboardProps) {
+  const roster = useMemo(() => reviveRoster(props.roster), [props.roster]);
+  const resignations = useMemo(() => reviveResignations(props.resignations), [props.resignations]);
+  const grievances = useMemo(() => reviveGrievances(props.grievances), [props.grievances]);
+  const pipCases = useMemo(() => revivePipCases(props.pipCases), [props.pipCases]);
+  const connects = useMemo(() => reviveConnects(props.connects), [props.connects]);
+  const { pipSummary, lastRefreshed } = props;
+
   const now = useMemo(() => new Date(), []);
 
   const [preset, setPreset] = useState<PeriodPreset>("month");
