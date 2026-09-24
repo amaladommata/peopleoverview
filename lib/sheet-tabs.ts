@@ -1,15 +1,17 @@
 // Exact tab layout of the live "Global Media & Creative - People Dashboard"
-// sheet (spreadsheetId in GOOGLE_SHEET_ID), verified 2026-09-02. This sheet
+// sheet (spreadsheetId in GOOGLE_SHEET_ID), verified 2026-09-24. This sheet
 // was restructured after the PRD/Appendix were written — tab names and a
 // couple of schemas differ from what's documented there. Row numbers are
 // 1-indexed A1-notation. Update here, not per-caller, if HRBP restructures
 // a tab again.
 export const SHEET_TABS = {
-  // NOTE: confirmed with HRBP to stay a single continuously-updated tab
-  // (not renamed monthly) — same as `resignation` below. The trailing
-  // "- 29" is unconfirmed to be stable; if it ever changes, update here.
+  // Was "Employee Data - 29" — that numeric suffix turned out NOT to be
+  // stable (it broke production within weeks, "Unable to parse range").
+  // Renamed to the plain "Employee Data" on 2026-09-24 specifically to
+  // stop this from recurring. If this tab ever gets renamed again, this
+  // is the single line to fix.
   headcount: {
-    name: "Employee Data - 29",
+    name: "Employee Data",
     headerRow: 1,
     dataStartRow: 2,
     lastCol: "AB",
